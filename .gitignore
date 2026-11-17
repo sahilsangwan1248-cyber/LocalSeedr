@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+Thumbs.db
+
+# runtime data never belongs in the repo
+downloads/
+data/
+*.part
+*.part.json
