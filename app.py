@@ -591,19 +591,19 @@ def view(t):
             v.update(status="error", done=0, size=0, progress=0, down=0, up=0, peers=0)
             return v
         s = h.status()
-        status = "paused" if t["paused"] and s.state != lt.torrent_status.downloading_metadata else STATES.get(s.state, "downloading")
-        if t["paused"] and status != "completed":
-            status = "paused"
-        t["name"] = s.name or t["name"]
-        v.update(name=t["name"], status=status, done=s.total_wanted_done, size=s.total_wanted, progress=s.progress,
-                 down=s.download_rate, up=s.upload_rate, peers=s.num_peers, seeds=s.num_seeds, error=None)
-        if status == "completed" and not t["paused"]:
-            # Seedr-style: stop as soon as the content is on disk, no seeding
-            h.pause()
+        finished = STATES.get(s.state) == "completed"
+        if finished and t.get("status") != "completed" and (not t["paused"] or t.get("_soft_until")):
+            # Seedr-style: stop as soon as the content is on disk, no seeding (also if it finished while soft-paused)
+            hard_pause(t, h)
             t["paused"] = True
             t["status"] = "completed"
             t["size"] = s.total_wanted
             save_state()
+        status = "paused" if t["paused"] and s.state != lt.torrent_status.downloading_metadata else STATES.get(s.state, "downloading")
+        t["name"] = s.name or t["name"]
+        v.update(name=t["name"], status=status, done=s.total_wanted_done, size=s.total_wanted, progress=s.progress,
+                 down=0 if t["paused"] else s.download_rate, up=0 if t["paused"] else s.upload_rate,
+                 peers=s.num_peers, seeds=s.num_seeds, error=None)
         if t["status"] == "completed":
             v["status"], v["progress"] = "completed", 1
     return v
@@ -781,6 +781,31 @@ def api_task_reveal(tid):
     return jsonify(ok=True)
 
 
+# Pausing a torrent for real closes every peer connection, and resuming then takes 1-3 minutes to get back
+# to speed (reconnect, handshake, wait to be unchoked by seeds, TCP slow start). So Pause first only throttles
+# the torrent to a trickle and keeps its connections; after SOFT_PAUSE_SECS it becomes a real pause.
+SOFT_PAUSE_SECS = int(os.environ.get("LOCALSEEDR_SOFT_PAUSE", "600"))
+TRICKLE = 2048  # bytes/s each way while soft-paused: keeps us "interested" and connected, uses next to no data
+
+
+def soft_pause(t, h):
+    h.set_download_limit(TRICKLE)
+    h.set_upload_limit(TRICKLE)
+    t["_soft_until"] = time.time() + SOFT_PAUSE_SECS
+
+
+def hard_pause(t, h):
+    t["_soft_until"] = None
+    h.pause()
+
+
+def unpause(t, h):
+    t["_soft_until"] = None
+    h.set_download_limit(-1)  # unlimited
+    h.set_upload_limit(-1)
+    h.resume()  # no-op if it was only soft-paused
+
+
 @app.post("/api/tasks/<tid>/<action>")
 def api_task_action(tid, action):
     t = tasks.get(tid) or abort(404)
@@ -790,14 +815,14 @@ def api_task_action(tid, action):
             t["_stop"].set()
             t["status"] = "paused"
         elif tid in handles:
-            handles[tid].pause()
+            soft_pause(t, handles[tid])
     elif action == "resume":
         t["paused"] = False
         if t["kind"] == "http":
             if t["status"] in ("paused", "error"):
                 start_http(tid)
         elif tid in handles:
-            handles[tid].resume()
+            unpause(t, handles[tid])
     else:
         abort(400)
     save_state()
@@ -1033,6 +1058,8 @@ def swarm_monitor():
         for tid, h in list(handles.items()):
             try:
                 t = tasks.get(tid)
+                if t and t["paused"] and t.get("_soft_until") and time.time() >= t["_soft_until"]:
+                    hard_pause(t, h)  # paused for 10 minutes: now close the connections for real
                 if not t or t["paused"]:
                     continue
                 s = h.status()

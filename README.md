@@ -10,6 +10,7 @@ Everything stays on your machine. There is no account, no cloud storage and no s
   - Adds a maintained list of public trackers so magnets without trackers still find peers
   - Uses DHT, peer exchange and local peer discovery; re-announces on its own when a torrent has few peers
   - Stops as soon as the download finishes (no seeding afterwards)
+  - Quick pause: for the first 10 minutes a paused torrent stays connected to its peers at a trickle, so Resume gets back to speed straight away; after that it stops fully
 - **Direct links** (`http://` and `https://`)
   - Splits big files into parts and downloads them over several connections at once
   - Adjusts the number of connections to what each server allows, and backs off when a server says it is busy
@@ -90,6 +91,7 @@ LocalSeedr works without any setup. To change something, set an environment vari
 | `LOCALSEEDR_CONNS` | `16` | Maximum connections per direct download |
 | `LOCALSEEDR_HOST` | `127.0.0.1` | Network address the page listens on (see *Security*) |
 | `LOCALSEEDR_NO_BROWSER` | not set | Set to `1` to stop the browser opening on start |
+| `LOCALSEEDR_SOFT_PAUSE` | `600` | Seconds a paused torrent stays connected before it stops fully |
 
 Example (macOS or Linux): `LOCALSEEDR_DIR="/Volumes/External/Downloads" bash start.sh`
 
