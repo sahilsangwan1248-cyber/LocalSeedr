@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LocalSeedr</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--text:#18202a;--muted:#6b7684;--faint:#9aa4b1;--line:#e6e9ee;--hover:#f1f3f6;
+  --accent:#15955a;--accent-2:#0f7a49;--accent-soft:#e3f4ec;
+  --blue:#2f6fde;--blue-soft:#e6eefc;--danger:#d14343;--danger-soft:#fbe9e9;--warn:#b7791f;--warn-soft:#fbf1e1;
+  --bar:#e9ecf1;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);--radius:12px
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1318;--card:#171c23;--text:#e7ebf0;--muted:#8d98a6;--faint:#5f6a77;--line:#252c35;--hover:#1e252e;
+  --accent:#2bbd7a;--accent-2:#24a56a;--accent-soft:#16382a;
+  --blue:#6a9cf5;--blue-soft:#1b2a45;--danger:#f07171;--danger-soft:#3a1f22;--warn:#e0a44a;--warn-soft:#3a2d17;
+  --bar:#232a33;--shadow:none
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* header */
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.top{max-width:880px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+.logo i{width:26px;height:26px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:#fff}
+.logo i svg{width:15px;height:15px}
+.stats{margin-left:auto;display:flex;align-items:center;gap:18px;font-size:12px;color:var(--muted)}
+.disk{display:flex;flex-direction:column;gap:4px;min-width:150px}
+.disk .bar{height:4px}
+.net{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.dot.ok{background:var(--accent)}.dot.bad{background:var(--warn)}
+
+main{max-width:880px;margin:0 auto;padding:20px 16px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+/* add bar */
+.adder{padding:14px;transition:border-color .15s,background .15s}
+.adder.drag{border-color:var(--accent);background:var(--accent-soft)}
+.addrow{display:flex;gap:10px;align-items:flex-start}
+.addrow textarea{flex:1;min-width:0;resize:none;overflow:hidden;min-height:42px;max-height:160px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);outline:none;line-height:1.45}
+.addrow textarea:focus,.editor input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.primary{height:42px;padding:0 20px;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+.primary:hover{background:var(--accent-2)}
+.subrow{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--muted);cursor:pointer;font-size:12.5px}
+.chip:hover{background:var(--hover);color:var(--text)}
+.chip b{font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:360px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+.ghostlink{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:5px 8px;border-radius:8px;color:var(--muted);cursor:pointer;font-size:12.5px}
+.ghostlink:hover{background:var(--hover);color:var(--text)}
+.editor{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.editor[hidden]{display:none}
+.editrow{display:flex;gap:8px;flex-wrap:wrap}
+.editor input{flex:1;min-width:220px;height:36px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);outline:none;font:12.5px ui-monospace,SFMono-Regular,Consolas,monospace}
+.btn{height:36px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--hover)}
+.btn:disabled{opacity:.6;cursor:wait}
+.hint{margin-top:6px;font-size:12px;color:var(--muted)}
+.hint.bad{color:var(--danger)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin:22px 0 10px}
+.tab{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-weight:600;cursor:pointer}
+.tab:hover{color:var(--text);background:var(--hover)}
+.tab.on{color:var(--text);background:var(--card);box-shadow:var(--shadow);outline:1px solid var(--line)}
+.count{min-width:20px;padding:0 6px;border-radius:999px;background:var(--bar);font-size:11.5px;line-height:18px;text-align:center}
+.count:empty{display:none}
+
+/* transfer list */
+.list{padding:4px 0}
+.item{display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:start;padding:14px 16px;border-top:1px solid var(--line);position:relative}
+.item:first-child{border-top:0}
+.kind{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--bar);color:var(--muted)}
+.body{min-width:0}
+.title{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sub{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:3px;font-size:12.5px;color:var(--muted)}
+.sub .sep{color:var(--faint)}
+.badge{padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--bar);color:var(--muted)}
+.b-downloading{background:var(--blue-soft);color:var(--blue)}
+.b-completed{background:var(--accent-soft);color:var(--accent)}
+.b-error{background:var(--danger-soft);color:var(--danger)}
+.b-checking,.b-metadata,.b-queued{background:var(--warn-soft);color:var(--warn)}
+.bar{height:6px;margin-top:9px;border-radius:999px;background:var(--bar);overflow:hidden}
+.bar>i{display:block;height:100%;width:0;border-radius:inherit;background:var(--blue);transition:width .5s}
+.done .bar>i{background:var(--accent)}
+.paused .bar>i{background:var(--faint)}
+.where{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:12px;color:var(--faint);min-width:0}
+.where span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.where svg{width:13px;height:13px}
+.err{margin-top:6px;font-size:12.5px;color:var(--danger)}
+.actions{display:flex;gap:2px}
+.icon{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}
+.icon:hover{background:var(--hover);color:var(--text)}
+.icon.danger:hover{color:var(--danger);background:var(--danger-soft)}
+.menu{position:absolute;right:14px;top:50px;z-index:3;min-width:220px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(16,24,40,.14)}
+.menu button{display:flex;width:100%;align-items:center;gap:8px;padding:8px 10px;border:0;border-radius:6px;background:transparent;text-align:left;cursor:pointer}
+.menu button:hover{background:var(--hover)}
+.menu .danger{color:var(--danger)}
+.menu small{display:block;color:var(--muted);font-size:11.5px}
+.empty{padding:44px 16px;text-align:center;color:var(--muted)}
+.empty svg{width:28px;height:28px;color:var(--faint);margin-bottom:6px}
+
+/* files */
+.fhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.fhead select{max-width:100%;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:13px}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px;font-size:13px;color:var(--faint)}
+.crumbs a{padding:2px 6px;border-radius:6px;color:var(--muted);cursor:pointer;text-decoration:none}
+.crumbs a:hover{background:var(--hover);color:var(--text)}
+.crumbs a:last-child{color:var(--text);font-weight:600}
+.frow{display:grid;grid-template-columns:20px 1fr auto auto;gap:12px;align-items:center;padding:8px 16px;border-top:1px solid var(--line)}
+.frow:first-child{border-top:0}
+.frow:hover{background:var(--hover)}
+.frow .ficon{color:var(--muted)}
+.frow .folder{color:var(--warn)}
+.frow a.fname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit;text-decoration:none;cursor:pointer}
+.frow a.fname:hover{text-decoration:underline}
+.fsize{font-size:12.5px;color:var(--muted);text-align:right;min-width:70px}
+.factions{display:flex;gap:2px;opacity:.75}
+.frow:hover .factions{opacity:1}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,20px);opacity:0;pointer-events:none;max-width:min(560px,calc(100% - 32px));padding:10px 14px;border-radius:10px;background:#18202a;color:#fff;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);transition:.2s}
+.toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast.bad{background:#a83232}
+
+@media (max-width:640px){
+  .stats .net span{display:none}
+  .disk{min-width:110px}
+  .item{grid-template-columns:1fr;gap:8px}
+  .kind{display:none}
+  .actions{justify-content:flex-start;margin-left:-6px}
+  .menu{left:16px;right:auto;top:auto}
+  .chip b{max-width:200px}
+  .frow{grid-template-columns:20px 1fr auto}
+  .fsize{display:none}
+}
+</style>
+</head>
+<body>
+<header><div class="top">
+  <div class="logo"><i><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg></i>LocalSeedr</div>
+  <div class="stats">
+    <div class="net" id="net" title=""><span class="dot" id="netDot"></span><span id="netText">Idle</span></div>
+    <div class="disk" title="Free space on the drive of your default download folder"><div id="diskText">&nbsp;</div><div class="bar"><i id="diskBar"></i></div></div>
+  </div>
+</div></header>
+
+<main>
+  <section class="card adder" id="adder">
+    <div class="addrow">
+      <textarea id="url" rows="1" placeholder="Paste a magnet link, .torrent link or file URL" aria-label="Link to download"></textarea>
+      <button class="primary" id="addBtn">Add</button>
+    </div>
+    <div class="subrow">
+      <button class="chip" id="saveChip" title="Change where this download is saved">
+        <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        Save to <b id="saveLabel">&hellip;</b><span id="saveFree"></span>
+      </button>
+      <label class="ghostlink" title="Or drop .torrent files anywhere on this box">
+        <svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Upload .torrent
+        <input id="tfile" type="file" accept=".torrent" multiple hidden>
+      </label>
+    </div>
+    <div class="editor" id="editor" hidden>
+      <div class="editrow">
+        <input id="dir" list="dirlist" spellcheck="false" autocomplete="off" aria-label="Download folder">
+        <datalist id="dirlist"></datalist>
+        <button class="btn" id="browse"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Browse</span></button>
+        <button class="btn" id="setdef" title="Use this folder for every new download">Make default</button>
+      </div>
+      <div class="hint" id="dirinfo"></div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab on" data-tab="transfers" role="tab">Transfers <span class="count" id="tCount"></span></button>
+    <button class="tab" data-tab="files" role="tab">Files</button>
+  </nav>
+
+  <section class="card" id="pane-transfers"><div class="list" id="tasks"></div></section>
+
+  <section class="card" id="pane-files" hidden>
+    <div class="fhead"><select id="root" aria-label="Download folder"></select><div class="crumbs" id="crumbs"></div></div>
+    <div id="files"></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>{if(!n)return'0 B';const u=['B','KB','MB','GB','TB'];const i=Math.min(4,Math.floor(Math.log(n)/Math.log(1024)));return (n/1024**i).toFixed(i?1:0)+' '+u[i]};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Every request carries this header; the server refuses changes without it (blocks other websites).
+const api=(url,opt={})=>fetch(url,{...opt,headers:{'X-LocalSeedr':'1',...(opt.headers||{})}});
+const postJSON=(url,data)=>api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})});
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+
+const P={
+  pause:'<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+  play:'<path d="M7 5l12 7-12 7z"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  trash:'<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/>',
+  list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  down:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  magnet:'<path d="M6 4v7a6 6 0 0 0 12 0V4M6 4h4v7a2 2 0 0 0 4 0V4h4M6 8h4M14 8h4"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  film:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+  inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>'
+};
+const ic=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+const MEDIA=/\.(mp4|m4v|mkv|webm|mov|avi|mp3|m4a|flac|wav|ogg|aac)$/i;
+
+let toastTimer;
+function toast(text,bad){const t=$('#toast');t.textContent=text;t.className='toast show'+(bad?' bad':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast'+(bad?' bad':''),bad?7000:3500);}
+
+let home='',defaultDir='',rootId='',path='',lastDone='',openMenu=null;
+const short=p=>p&&home&&p.toLowerCase().startsWith(home.toLowerCase())?'~'+p.slice(home.length):(p||'');
+
+/* ---------- tabs */
+function showTab(name){
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  $('#pane-transfers').hidden=name!=='transfers';$('#pane-files').hidden=name!=='files';
+  store.set('tab',name); if(name==='files')loadRoots();
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+/* ---------- save-to folder */
+async function loadSettings(){
+  const s=await (await api('/api/settings')).json();
+  home=s.home; defaultDir=s.default_dir;
+  if(!$('#dir').value)$('#dir').value=s.default_dir;
+  $('#dirlist').innerHTML=[s.default_dir,...s.recent_dirs].filter((v,i,a)=>a.indexOf(v)===i).map(d=>`<option value="${esc(d)}">`).join('');
+  checkDir();
+}
+let dirTimer;
+async function checkDir(){
+  const v=$('#dir').value.trim(), el=$('#dirinfo');
+  const j=await (await api('/api/dirinfo?path='+encodeURIComponent(v))).json();
+  $('#saveLabel').textContent=short(j.ok?j.path:v)||'default folder';
+  if(!j.ok){el.className='hint bad';el.textContent=j.error;$('#saveFree').textContent='';return;}
+  const isDef=j.path.toLowerCase()===defaultDir.toLowerCase();
+  $('#saveFree').textContent=` · ${fmt(j.free)} free`;
+  el.className='hint';
+  el.textContent=(j.exists?'':'This folder will be created. ')+(isDef?'This is your default folder.':'Only for downloads you add now. Click "Make default" to keep it.');
+}
+$('#saveChip').onclick=()=>{const e=$('#editor');e.hidden=!e.hidden;if(!e.hidden)$('#dir').focus();};
+$('#dir').oninput=()=>{clearTimeout(dirTimer);dirTimer=setTimeout(checkDir,300);};
+$('#browse').onclick=async()=>{
+  const b=$('#browse');b.disabled=true;b.querySelector('span').textContent='Waiting…';
+  toast('A folder window opened. If you cannot see it, check your taskbar or Dock.');
+  try{
+    const j=await (await postJSON('/api/pick-folder',{start:$('#dir').value.trim()})).json();
+    if(j.path){$('#dir').value=j.path;checkDir();}
+    else if(j.error)toast(j.error,true);
+  }finally{b.disabled=false;b.querySelector('span').textContent='Browse';}
+};
+$('#setdef').onclick=async()=>{
+  const j=await (await postJSON('/api/settings',{default_dir:$('#dir').value.trim()})).json();
+  if(j.error){toast(j.error,true);return;}
+  defaultDir=j.default_dir;$('#dir').value=j.default_dir;toast('New downloads now go to '+short(j.default_dir));
+  rootId='';loadSettings();poll();
+};
+
+/* ---------- adding */
+const urlBox=$('#url');
+const grow=()=>{urlBox.style.height='auto';urlBox.style.height=Math.min(urlBox.scrollHeight+2,160)+'px';};
+urlBox.oninput=grow;
+urlBox.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();add();}};
+async function add(){
+  const url=urlBox.value.trim(); if(!url){urlBox.focus();return;}
+  const j=await (await postJSON('/api/add',{url,dir:$('#dir').value.trim()})).json();
+  const errs=(j.errors||[]).concat(j.error?[j.error]:[]);
+  if(errs.length)toast(errs.join(' · '),true);
+  if(j.added&&j.added.length){urlBox.value='';grow();showTab('transfers');if(!errs.length)toast(j.added.length>1?`Added ${j.added.length} downloads`:'Download added');loadSettings();}
+  poll();
+}
+$('#addBtn').onclick=add;
+async function upload(files){
+  files=[...files].filter(f=>/\.torrent$/i.test(f.name)); if(!files.length){toast('Only .torrent files can be dropped here',true);return;}
+  const fd=new FormData(); files.forEach(f=>fd.append('file',f)); fd.append('dir',$('#dir').value.trim());
+  const j=await (await api('/api/add-torrent',{method:'POST',body:fd})).json();
+  if((j.errors||[]).length)toast(j.errors.join(' · '),true); else toast(files.length>1?`Added ${files.length} torrents`:'Torrent added');
+  showTab('transfers');loadSettings();poll();
+}
+$('#tfile').onchange=e=>{upload(e.target.files);e.target.value='';};
+const adder=$('#adder');
+['dragenter','dragover'].forEach(ev=>adder.addEventListener(ev,e=>{e.preventDefault();adder.classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>adder.addEventListener(ev,e=>{e.preventDefault();if(ev==='dragleave'&&adder.contains(e.relatedTarget))return;adder.classList.remove('drag');}));
+adder.addEventListener('drop',e=>{if(e.dataTransfer.files.length)upload(e.dataTransfer.files);});
+
+/* ---------- transfers */
+const LABEL={downloading:'Downloading',completed:'Done',paused:'Paused',error:'Error',checking:'Checking files',metadata:'Finding info',queued:'Starting'};
+function eta(t){const s=t.down>1024&&t.size?(t.size-t.done)/t.down:0;if(!s||s>30*86400)return'';
+  return s<60?'under a minute left':s<3600?Math.ceil(s/60)+' min left':s<86400?(s/3600).toFixed(1)+' h left':(s/86400).toFixed(1)+' days left';}
+function itemHTML(t){
+  const done=t.status==='completed', paused=t.status==='paused'||t.status==='error', live=!done&&!paused;
+  const pct=Math.round((t.progress||0)*1000)/10, sep='<span class="sep">·</span>';
+  const bits=[`<span class="badge b-${esc(t.status)}">${LABEL[t.status]||esc(t.status)}</span>`];
+  bits.push(done?`<span>${fmt(t.size||t.done)}</span>`:`<span>${fmt(t.done)}${t.size?' of '+fmt(t.size):''}${t.size?' ('+pct+'%)':''}</span>`);
+  if(live&&t.down)bits.push(sep+`<span>${fmt(t.down)}/s</span>`);
+  if(live&&eta(t))bits.push(sep+`<span>${eta(t)}</span>`);
+  if(live)bits.push(sep+(t.kind==='http'?`<span>${t.peers} connection${t.peers===1?'':'s'}</span>`:`<span>${t.peers} peer${t.peers===1?'':'s'} (${t.seeds||0} seeds)</span>`));
+  const menu=openMenu===t.id?`<div class="menu">
+      <button data-act="remove" data-id="${t.id}">${ic('list')}<span>Remove from list<small>Keeps ${done?'the downloaded files':'what has downloaded so far'}</small></span></button>
+      <button class="danger" data-act="purge" data-id="${t.id}">${ic('trash')}<span>Remove and delete files<small>Cannot be undone</small></span></button></div>`:'';
+  return `<div class="kind">${ic(t.kind==='http'?'link':'magnet')}</div>
+    <div class="body">
+      <div class="title" title="${esc(t.name)}">${esc(t.name)}</div>
+      <div class="sub">${bits.join('')}</div>
+      ${done?'':`<div class="bar"><i style="width:${pct}%"></i></div>`}
+      ${t.error?`<div class="err">${esc(t.error)}</div>`:''}
+      <div class="where" title="${esc(t.dir)}">${ic('folder')}<span>${esc(short(t.dir))}</span></div>
+    </div>
+    <div class="actions">
+      ${done?'':`<button class="icon" data-act="${paused?'resume':'pause'}" data-id="${t.id}" title="${paused?'Resume':'Pause'}">${ic(paused?'play':'pause')}</button>`}
+      <button class="icon" data-act="reveal" data-id="${t.id}" title="Show in folder">${ic('folder')}</button>
+      <button class="icon danger" data-act="menu" data-id="${t.id}" title="Remove">${ic('x')}</button>
+    </div>${menu}`;
+}
+let lastTasks=[];
+function renderTasks(tasks){
+  const box=$('#tasks');
+  if(!tasks.length){box.innerHTML=`<div class="empty">${ic('inbox')}<div>No downloads yet</div><div style="font-size:12.5px">Paste a link above, or drop a .torrent file on it.</div></div>`;box.dataset.empty='1';return;}
+  if(box.dataset.empty){box.innerHTML='';delete box.dataset.empty;}
+  const seen=new Set();
+  tasks.forEach((t,i)=>{
+    seen.add(t.id);
+    const cls='item'+(t.status==='completed'?' done':'')+(t.status==='paused'||t.status==='error'?' paused':'');
+    const html=itemHTML(t);
+    let el=box.querySelector(`[data-key="${t.id}"]`);
+    if(!el){el=document.createElement('div');el.dataset.key=t.id;}
+    if(el.dataset.h!==html||el.className!==cls){el.className=cls;el.innerHTML=html;el.dataset.h=html;}
+    if(box.children[i]!==el)box.insertBefore(el,box.children[i]||null);
+  });
+  [...box.children].forEach(el=>{if(!seen.has(el.dataset.key))el.remove();});
+}
+$('#tasks').onclick=async e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const id=b.dataset.id, act=b.dataset.act;
+  if(act==='menu'){openMenu=openMenu===id?null:id;renderTasks(lastTasks);return;}
+  openMenu=null;
+  if(act==='remove'||act==='purge'){await api(`/api/tasks/${id}?files=${act==='purge'?1:0}`,{method:'DELETE'});toast(act==='purge'?'Removed and deleted files':'Removed from list');}
+  else await api(`/api/tasks/${id}/${act}`,{method:'POST'});
+  poll();
+};
+document.addEventListener('click',e=>{if(openMenu&&!e.target.closest('.menu,[data-act="menu"]')){openMenu=null;renderTasks(lastTasks);}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&openMenu){openMenu=null;renderTasks(lastTasks);}});
+
+async function poll(){
+  try{
+    const j=await (await api('/api/tasks')).json();
+    lastTasks=j.tasks;renderTasks(j.tasks);
+    const active=j.tasks.filter(t=>t.status!=='completed').length;
+    $('#tCount').textContent=j.tasks.length?(active||j.tasks.length):'';
+    $('#tCount').title=active?`${active} active`:'';
+    $('#diskText').textContent=`${fmt(j.disk.free)} free`;
+    $('#diskBar').style.width=(j.disk.total?j.disk.used/j.disk.total*100:0)+'%';
+    const d=j.tasks.filter(t=>t.status==='completed').map(t=>t.id).join(',');
+    if(d!==lastDone){lastDone=d;if(!$('#pane-files').hidden)loadRoots();}
+  }catch(e){}
+}
+
+/* ---------- files */
+async function loadRoots(){
+  const j=await (await api('/api/roots')).json();
+  if(!j.roots.some(r=>r.id===rootId)){rootId=(j.roots.find(r=>r.default)||j.roots[0]||{}).id||'';path='';}
+  $('#root').innerHTML=j.roots.map(r=>`<option value="${r.id}" ${r.id===rootId?'selected':''}>${esc(short(r.path))}${r.default?'  (default)':''}</option>`).join('');
+  loadFiles();
+}
+$('#root').onchange=e=>{rootId=e.target.value;path='';loadFiles();};
+async function loadFiles(){
+  const box=$('#files');
+  if(!rootId){box.innerHTML=`<div class="empty">${ic('folder')}<div>No download folder yet</div></div>`;return;}
+  const j=await (await api(`/api/files?root=${rootId}&path=`+encodeURIComponent(path))).json().catch(()=>({files:[]}));
+  const parts=path?path.split('/'):[];
+  $('#crumbs').innerHTML=parts.length?['<a data-go="">Top</a>',...parts.map((p,i)=>`<span>/</span><a data-go="${esc(parts.slice(0,i+1).join('/'))}">${esc(p)}</a>`)].join(''):'';
+  const files=j.files||[];
+  box.innerHTML=files.length?files.map(f=>{
+    const rel=(path?path+'/':'')+f.name, url=`/files/${rootId}/`+rel.split('/').map(encodeURIComponent).join('/');
+    const icon=f.dir?`<span class="ficon folder">${ic('folder')}</span>`:`<span class="ficon">${ic(MEDIA.test(f.name)?'film':'file')}</span>`;
+    return `<div class="frow">${icon}
+      <a class="fname" ${f.dir?`data-go="${esc(rel)}"`:`href="${url}" target="_blank" title="${MEDIA.test(f.name)?'Play in browser':'Open'}"`}>${esc(f.name)}</a>
+      <span class="fsize">${fmt(f.size)}</span>
+      <span class="factions">${f.dir?'':`<a class="icon" href="${url}?dl=1" title="Download a copy">${ic('down')}</a>`}
+        <button class="icon danger" data-rm="${esc(rel)}" title="Delete">${ic('trash')}</button></span></div>`;}).join('')
+    :`<div class="empty">${ic('folder')}<div>This folder is empty</div></div>`;
+}
+$('#pane-files').onclick=async e=>{
+  const g=e.target.closest('[data-go]'); if(g){e.preventDefault();path=g.dataset.go;loadFiles();return;}
+  const r=e.target.closest('[data-rm]');
+  if(r){if(!confirm(`Delete "${r.dataset.rm}" permanently?\nThis cannot be undone.`))return;
+    await api(`/api/files?root=${rootId}&path=`+encodeURIComponent(r.dataset.rm),{method:'DELETE'});toast('Deleted');loadFiles();}
+};
+
+/* ---------- connectivity */
+async function diag(){
+  try{
+    const d=await (await api('/api/diag')).json(), open=d.incoming_peers>0, idle=!d.incoming_peers&&!d.outgoing_peers;
+    $('#netDot').className='dot'+(idle?'':open?' ok':' bad');
+    $('#netText').textContent=idle?'Idle':open?'Peers can reach you':'Incoming blocked';
+    $('#net').title=idle?'No torrent is active.':(open?`${d.incoming_peers} peers connected to you.`:'Only outgoing connections work, so you reach roughly half of each swarm. Allow LocalSeedr through your firewall (a phone hotspot may block incoming connections anyway).')
+      +`\nPort ${d.listen_port} · peers in/out ${d.incoming_peers}/${d.outgoing_peers} · DHT nodes ${d.dht_nodes}`;
+  }catch(e){}
+}
+
+showTab(store.get('tab')==='files'?'files':'transfers');
+loadSettings();poll();diag();setInterval(poll,1000);setInterval(diag,5000);
+</script>
+</body>
+</html>
