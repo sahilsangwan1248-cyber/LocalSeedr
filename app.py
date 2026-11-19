@@ -38,6 +38,34 @@ app.config["MAX_CONTENT_LENGTH"] = None  # no upload limit
 lock = threading.RLock()
 tasks = {}  # id -> dict (persisted fields + runtime fields)
 
+# --------------------------------------------------------------------------- web requests and proxies
+# requests follows the computer's proxy settings (Windows Internet Options / macOS network settings /
+# HTTP(S)_PROXY variables). VPN, ad-block and "unblocker" apps often leave a proxy such as 127.0.0.1:9
+# behind after they are switched off, and every web download then fails. If the proxy cannot be reached,
+# LocalSeedr goes direct from then on. LOCALSEEDR_NO_PROXY=1 always ignores the proxy settings.
+_direct = os.environ.get("LOCALSEEDR_NO_PROXY") == "1"
+
+
+def new_session():
+    s = requests.Session()
+    s.headers["User-Agent"] = "Mozilla/5.0 LocalSeedr"
+    if _direct:
+        s.trust_env = False  # ignore system/environment proxy settings
+    return s
+
+
+def http_get(url, **kw):
+    """requests.get that falls back to a direct connection when the configured proxy is unreachable."""
+    global _direct
+    try:
+        return new_session().get(url, **kw)
+    except requests.exceptions.ProxyError as e:
+        if _direct:
+            raise
+        _direct = True
+        print(f"Proxy unreachable ({str(e)[:120]}); connecting directly from now on.", file=sys.stderr, flush=True)
+        return new_session().get(url, **kw)
+
 # --------------------------------------------------------------------------- torrent session
 ses = lt.session({
     "listen_interfaces": "0.0.0.0:6881,[::]:6881",
@@ -195,7 +223,7 @@ def add_source(url, save_dir):
         add_torrent_handle(t["id"], url, "magnet", save_dir)
     elif re.match(r"^https?://", url, re.I):
         if urlparse(url).path.lower().endswith(".torrent"):
-            r = requests.get(url, timeout=60)
+            r = http_get(url, timeout=60)
             r.raise_for_status()
             return add_torrent_bytes(r.content, save_dir)
         t = new_task("http", url, os.path.basename(unquote(urlparse(url).path)) or "download", save_dir)
@@ -246,7 +274,7 @@ THROTTLE_CODES = {403, 429, 503, 509}
 
 def probe(url):
     """Ask for byte 0 only: tells us the name, the total size and whether Range is supported."""
-    with requests.get(url, headers={**UA, "Range": "bytes=0-0"}, stream=True, timeout=(15, 30), allow_redirects=True) as r:
+    with http_get(url, headers={"Range": "bytes=0-0"}, stream=True, timeout=(15, 30), allow_redirects=True) as r:
         name = filename_from_headers(r, url)
         if r.status_code == 206:
             m = re.search(r"/(\d+)\s*$", r.headers.get("Content-Range", ""))
@@ -285,8 +313,7 @@ def claim(t):
 
 
 def seg_worker(t, stop):
-    sess = requests.Session()  # keep-alive: later segments reuse the TCP/TLS connection
-    sess.headers.update(UA)
+    sess = new_session()  # keep-alive: later segments reuse the TCP/TLS connection
     seg = None
     try:
         seg = claim(t)
@@ -349,6 +376,13 @@ def run_seg(t, seg, stop, sess):
                         t["_recv"] -= 1
             if seg[2] > seg[1]:
                 return "done"
+        except requests.exceptions.ProxyError as e:
+            # the computer's proxy is dead (e.g. a VPN app left 127.0.0.1:9 behind): go direct and retry
+            global _direct
+            t["_err"] = str(e)
+            _direct = True
+            sess.trust_env = False
+            sess.proxies.clear()
         except requests.ConnectionError as e:
             # refused/reset while other connections are fine usually means a per-IP connection limit
             t["_err"] = str(e)
@@ -481,7 +515,7 @@ def http_single(tid):
             if have:
                 headers["Range"] = f"bytes={have}-"
             try:
-                with requests.get(t["source"], headers=headers, stream=True, timeout=(15, 30), allow_redirects=True) as r:
+                with http_get(t["source"], headers=headers, stream=True, timeout=(15, 30), allow_redirects=True) as r:
                     if r.status_code == 416 and part:  # already complete
                         have = os.path.getsize(part)
                         r.close()
@@ -556,6 +590,11 @@ def friendly_err(msg):
                 404: "File not found on the server (404). Check the link.", 410: "The file is no longer available (410)."
                 }.get(code, f"The server returned an error ({code}).")
     low = s.lower()
+    if "proxyerror" in low or "unable to connect to proxy" in low:
+        m = re.search(r"host='([^']+)', port=(\d+)", s.split("ProxyError", 1)[-1])
+        where = f" ({m.group(1)}:{m.group(2)})" if m else ""
+        return (f"Cannot reach the proxy set on this computer{where}, and connecting directly failed too. "
+                "Check your internet connection, or turn off the proxy in your system's network settings.")
     if "server limited connections" in low:
         return s[0].upper() + s[1:]
     if "getaddrinfo" in low or "name or service not known" in low or "nodename nor servname" in low:
@@ -656,7 +695,7 @@ def api_add():
         try:
             added.append(add_source(u, save_dir)["id"])
         except Exception as e:  # noqa: BLE001
-            errors.append(f"{u[:60]}: {e}")
+            errors.append(f"{u[:60]}: {friendly_err(e)}")
     return jsonify(added=added, errors=errors), (200 if added else 400)
 
 
@@ -671,7 +710,7 @@ def api_add_torrent():
         try:
             added.append(add_torrent_bytes(f.read(), save_dir)["id"])
         except Exception as e:  # noqa: BLE001
-            errors.append(f"{f.filename}: {e}")
+            errors.append(f"{f.filename}: {friendly_err(e)}")
     return jsonify(added=added, errors=errors), (200 if added else 400)
 
 
@@ -946,7 +985,7 @@ SESSION_STATE = os.path.join(DATA, "session.state")
 def refresh_trackers():
     """Pull a maintained list of live public trackers and add them to every running torrent."""
     try:
-        r = requests.get(TRACKER_LIST_URL, timeout=20)
+        r = http_get(TRACKER_LIST_URL, timeout=20)
         r.raise_for_status()
         fresh = [l.strip() for l in r.text.splitlines() if l.strip().startswith(("udp://", "http://", "https://"))][:40]
     except requests.RequestException:

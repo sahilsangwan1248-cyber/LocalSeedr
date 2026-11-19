@@ -92,6 +92,7 @@ LocalSeedr works without any setup. To change something, set an environment vari
 | `LOCALSEEDR_HOST` | `127.0.0.1` | Network address the page listens on (see *Security*) |
 | `LOCALSEEDR_NO_BROWSER` | not set | Set to `1` to stop the browser opening on start |
 | `LOCALSEEDR_SOFT_PAUSE` | `600` | Seconds a paused torrent stays connected before it stops fully |
+| `LOCALSEEDR_NO_PROXY` | not set | Set to `1` to ignore the computer's proxy settings for web downloads |
 
 Example (macOS or Linux): `LOCALSEEDR_DIR="/Volumes/External/Downloads" bash start.sh`
 
@@ -112,6 +113,7 @@ Example (macOS or Linux): `LOCALSEEDR_DIR="/Volumes/External/Downloads" bash sta
 - **"Python 3.9 to 3.13 is required"**: install a supported Python version from python.org. Python 3.14 is not supported yet because libtorrent has no ready-made package for it.
 - **The page does not open**: go to http://127.0.0.1:8765 yourself. If another program already uses that port, start LocalSeedr with a different `LOCALSEEDR_PORT`.
 - **Browse... says the folder picker is not available**: some Linux and Homebrew Python builds leave out Tk. Type the folder path into the box instead (or install your system's `python3-tk` package).
+- **"Unable to connect to proxy" / "Cannot reach the proxy set on this computer"**: your computer is set to send web traffic through a proxy that is not running, often `127.0.0.1:9` left behind by a VPN, ad-blocker or proxy app that was switched off. LocalSeedr now notices this and connects directly. If it still fails, turn the proxy off: on Windows, *Settings > Network & internet > Proxy* (switch off "Use a proxy server"); on macOS, *System Settings > Network > (your network) > Details > Proxies*.
 - **A direct download shows "retrying: ..."**: the server is busy or limiting connections. LocalSeedr keeps retrying and slows down on its own.
 - **A torrent shows 0% after restarting LocalSeedr**: when you resume it, LocalSeedr checks the files already on disk and continues from there.
 
